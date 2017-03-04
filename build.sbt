@@ -3,7 +3,7 @@ name := "dictionary"
 
 version := "1.0.0"
 
-akkaVersion := "2.4.11"
+val akkaVersion = "2.4.11"
 
 scalaVersion := "2.11.8"
 
