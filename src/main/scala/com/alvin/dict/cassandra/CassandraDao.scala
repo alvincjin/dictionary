@@ -73,6 +73,7 @@ trait CassandraDao extends Config {
     */
   def retrieveDescriptions(word: String): Future[List[Entry]] = {
 
+    require(verifyWord(word), "Word should contain only alphabet letters")
     val query = QueryBuilder.select()
       .from(keyspace, table)
       .where(QueryBuilder.eq("word", word.toLowerCase))
@@ -90,6 +91,7 @@ trait CassandraDao extends Config {
     */
   def retrieveEntries(prefix: String): Future[List[Entry]] = {
 
+    require(verifyWord(prefix), "Word should contain only alphabet letters")
     val word = prefix.toLowerCase
     val upperBound = word.take(word.length - 1) + (word.last + 1).toChar
     val query = QueryBuilder.select()
@@ -107,7 +109,7 @@ trait CassandraDao extends Config {
     * @return
     */
   def deleteEntry(word: String): Future[String] = {
-
+    require(verifyWord(word), "Word should contain only alphabet letters")
     val query = QueryBuilder.delete()
       .from(keyspace, table)
       .where(QueryBuilder.eq("word", word.toLowerCase))
@@ -149,5 +151,14 @@ trait CassandraDao extends Config {
     }.toList
   }
 
+  /**
+    * Verify the input is a valid word
+    * @param word
+    * @return
+    */
+  def verifyWord(word: String): Boolean = {
+    val letters = (('a' to 'z') ++ ('A' to 'Z')).toSet
+    word.forall(letters.contains(_))
+  }
 }
 
