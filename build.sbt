@@ -14,6 +14,14 @@ libraryDependencies ++= Seq(
   "com.typesafe.akka" %% "akka-http-spray-json-experimental" % akkaVersion
 )
 
+assemblyJarName in assembly := s"${name.value}-${version.value}.jar"
+
+assemblyMergeStrategy in assembly := {
+  case PathList("META-INF", xs @ _*) => MergeStrategy.discard
+  case "application.conf"            => MergeStrategy.concat
+  case x => MergeStrategy.first
+}
+
 scalacOptions := Seq("-unchecked", "-deprecation", "-Xexperimental")
 
 resolvers ++= Seq(
