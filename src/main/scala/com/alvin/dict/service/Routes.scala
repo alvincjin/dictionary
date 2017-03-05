@@ -32,18 +32,18 @@ trait Routes extends AkkaJSONProtocol {
               complete(result)
           }
         }
-      } ~ //Lookup entries with word starting with a specific prefix
+      } ~ //Retrieve entries with word starting with a specific prefix
       path("entry" / Segment) { prefix =>
         get {
-          onSuccess(readEntry(prefix)) {
+          onSuccess(retrieveDescriptions(prefix)) {
             case result: List[Entry] =>
               complete(result)
           }
         }
-      } ~ //Lookup the description of a given word
+      } ~ //Retrieve the description of a given word
       path("description" / Segment) { word =>
         get {
-          onSuccess(readDescription(word)) {
+          onSuccess(retrieveEntries(word)) {
             case result: List[Entry] =>
               complete(result)
           }

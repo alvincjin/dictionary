@@ -13,8 +13,8 @@ object ServiceBootstrap extends App with Routes {
 
   implicit val actorSystem = ActorSystem("Dictionary-Service")
   implicit val materializer = ActorMaterializer()
-
-  import actorSystem.dispatcher //ExecutionContext
+  //ExecutionContext
+  import actorSystem.dispatcher
 
   createTables(keyspace, table)
 
@@ -22,8 +22,8 @@ object ServiceBootstrap extends App with Routes {
 
   println(s"Server online at http://localhost:8080/\nPress RETURN to stop...")
   StdIn.readLine()
-
-  bindingFuture.flatMap(_.unbind()) // trigger unbinding from the port
-    .onComplete(_ => actorSystem.terminate()) // and shutdown when done
+  // trigger unbinding from the port and shutdown when done
+  bindingFuture.flatMap(_.unbind())
+    .onComplete(_ => actorSystem.terminate())
 
 }

@@ -2,12 +2,13 @@ package com.alvin.dict.cassandra
 
 import com.alvin.dict.model.Entry
 import com.alvin.dict.util.Config
+import com.datastax.driver.core.querybuilder.Select.Where
 import com.datastax.driver.core.querybuilder.{QueryBuilder, Select}
 import com.datastax.driver.core.{Cluster, QueryOptions, ResultSet}
+
 import scala.collection.JavaConversions._
 import scala.concurrent._
 import ExecutionContext.Implicits.global
-
 import scala.concurrent.Future
 
 /**
@@ -15,6 +16,7 @@ import scala.concurrent.Future
   */
 trait CassandraDao extends Config {
 
+  //Initiate a Cassandra session
   implicit val session = new Cluster.Builder()
     .addContactPoints(hosts.toArray: _*)
     .withPort(port)
@@ -22,7 +24,11 @@ trait CassandraDao extends Config {
     .build
     .connect
 
-
+  /**
+    * Create a keyspace and table if not exist
+    * @param keyspace
+    * @param table
+    */
   def createTables(keyspace: String, table: String): Unit = {
 
     session.execute(s"DROP KEYSPACE IF EXISTS $keyspace")
@@ -35,20 +41,26 @@ trait CassandraDao extends Config {
          |         )
        """.stripMargin
     )
-/*
-    session.execute(
-      s"""
-         |CREATE CUSTOM INDEX word_idx ON $keyspace.$table (word)
-         |USING 'org.apache.cassandra.index.sasi.SASIIndex'
-         |WITH OPTIONS = {
-         |'mode': 'CONTAINS',
-         |'analyzer_class': 'org.apache.cassandra.index.sasi.analyzer.StandardAnalyzer',
-         |'case_sensitive': 'false'
-         |}
-       """.stripMargin)*/
+
   }
 
+  /**
+    * Execute query and return the records
+    * @param query
+    * @return
+    */
+  def executeAndReturn(query: Where) = Future {
+    val resultSet: ResultSet = session.execute(query)
+    resultSet.map { row =>
+      Entry(row.getString("word"), row.getString("description"))
+    }.toList
+  }
 
+  /**
+    * Create a new entry in dictionary with word and its description
+    * @param entry
+    * @return
+    */
   def createEntry(entry: Entry): Future[String] = {
 
     val query = QueryBuilder.insertInto(keyspace, table)
@@ -61,54 +73,47 @@ trait CassandraDao extends Config {
     }
   }
 
-/*
-  def updateDescription(word: String, description: String): Future[String] = {
 
-    val query = QueryBuilder.update(keyspace, table)
-      .`with`(QueryBuilder.set("description", description))
-      .where(QueryBuilder.eq("word", word))
-
-    Future {
-      session.execute(query)
-      s"Inserted ${word} Successfully"
-    }
-  }
-*/
-  def readEntry(word: String): Future[List[Entry]] = {
+  /**
+    * Retrieve the description of a specific word
+    * @param word
+    * @return a list of entries
+    */
+  def retrieveDescriptions(word: String): Future[List[Entry]] = {
 
     val query = QueryBuilder.select()
       .from(keyspace, table)
       .where(QueryBuilder.eq("word", word.toLowerCase))
 
-    Future {
-      val resultSet: ResultSet = session.execute(query)
-      resultSet.map { row =>
-        Entry(row.getString("word"), row.getString("description"))}.toList
-    }
+    executeAndReturn(query)
   }
 
-  def readDescription(word: String): Future[List[Entry]] = {
+  /**
+    * Retrieve entries starting with a prefix
+    * @param prefix
+    * @return a list of entries
+    */
+  def retrieveEntries(prefix: String): Future[List[Entry]] = {
 
-
-    val upperBound = word.last match {
-      case c if (c >='a' && c < 'z') => word.take(word.length-1)+(word.last +1).toChar
-      case 'z' if word.length >1 => word.take(word.length-2)+(word(word.length-2) +1).toChar
-      case 'z' if word.length == 1 => "{"
+    val upperBound = prefix.last match {
+      case c if (c >= 'a' && c < 'z') => prefix.take(prefix.length - 1) + (prefix.last + 1).toChar
+      case 'z' if prefix.length > 1 => prefix.take(prefix.length - 2) + (prefix(prefix.length - 2) + 1).toChar
+      case 'z' if prefix.length == 1 => "{"
     }
 
     val query = QueryBuilder.select()
       .from(keyspace, table)
       .allowFiltering()
-      .where(QueryBuilder.gte("word", word)).and(QueryBuilder.lt("word", upperBound))
+      .where(QueryBuilder.gte("word", prefix)).and(QueryBuilder.lt("word", upperBound))
 
-    Future {
-      val resultSet: ResultSet = session.execute(query)
-      resultSet.map { row =>
-        Entry(row.getString("word"), row.getString("description"))}.toList
-    }
+    executeAndReturn(query)
   }
 
-
+  /**
+    * Delete an entry by given word
+    * @param word
+    * @return
+    */
   def deleteEntry(word: String): Future[String] = {
 
     val query = QueryBuilder.delete()
@@ -122,6 +127,11 @@ trait CassandraDao extends Config {
 
   }
 
+
+  /**
+    * Count the number of entries in the dictionary
+    * @return
+    */
   def countEntries(): Future[Long] = {
 
     val query = s"SELECT COUNT(*) as count FROM $keyspace.$table"
@@ -132,21 +142,6 @@ trait CassandraDao extends Config {
     }
   }
 
-/*
-  def queryDescription(keyword: String): Future[List[Entry]] = {
-
-    val query = QueryBuilder.select()
-      .from(keyspace, table)
-      .where(QueryBuilder.like("description", keyword))
-      .orderBy(QueryBuilder.asc("word"))
-
-    Future {
-      val resultSet: ResultSet = session.execute(query)
-      resultSet.map { row =>
-        Entry(row.getString("word"), row.getString("description"))}.toList
-    }
-  }
-*/
 
 }
 
