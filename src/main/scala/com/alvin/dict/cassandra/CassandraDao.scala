@@ -26,6 +26,7 @@ trait CassandraDao extends Config {
 
   /**
     * Create a keyspace and table if not exist
+    *
     * @param keyspace
     * @param table
     */
@@ -44,20 +45,10 @@ trait CassandraDao extends Config {
 
   }
 
-  /**
-    * Execute query and return the records
-    * @param query
-    * @return
-    */
-  def executeAndReturn(query: Where) = Future {
-    val resultSet: ResultSet = session.execute(query)
-    resultSet.map { row =>
-      Entry(row.getString("word"), row.getString("description"))
-    }.toList
-  }
 
   /**
     * Create a new entry in dictionary with word and its description
+    *
     * @param entry
     * @return
     */
@@ -76,6 +67,7 @@ trait CassandraDao extends Config {
 
   /**
     * Retrieve the description of a specific word
+    *
     * @param word
     * @return a list of entries
     */
@@ -90,27 +82,27 @@ trait CassandraDao extends Config {
 
   /**
     * Retrieve entries starting with a prefix
+    * Due to C* CQL doesn't support 'like' in the partition column
+    * Make a workaround to use slice range query by finding a upper bound of given prefix
+    *
     * @param prefix
     * @return a list of entries
     */
   def retrieveEntries(prefix: String): Future[List[Entry]] = {
 
-    val upperBound = prefix.last match {
-      case c if (c >= 'a' && c < 'z') => prefix.take(prefix.length - 1) + (prefix.last + 1).toChar
-      case 'z' if prefix.length > 1 => prefix.take(prefix.length - 2) + (prefix(prefix.length - 2) + 1).toChar
-      case 'z' if prefix.length == 1 => "{"
-    }
-
+    val word = prefix.toLowerCase
+    val upperBound = word.take(word.length - 1) + (word.last + 1).toChar
     val query = QueryBuilder.select()
       .from(keyspace, table)
       .allowFiltering()
-      .where(QueryBuilder.gte("word", prefix)).and(QueryBuilder.lt("word", upperBound))
+      .where(QueryBuilder.gte("word", word)).and(QueryBuilder.lt("word", upperBound))
 
     executeAndReturn(query)
   }
 
   /**
     * Delete an entry by given word
+    *
     * @param word
     * @return
     */
@@ -130,6 +122,7 @@ trait CassandraDao extends Config {
 
   /**
     * Count the number of entries in the dictionary
+    *
     * @return
     */
   def countEntries(): Future[Long] = {
@@ -142,6 +135,19 @@ trait CassandraDao extends Config {
     }
   }
 
+
+  /**
+    * Execute query and return the records
+    *
+    * @param query
+    * @return
+    */
+  def executeAndReturn(query: Where) = Future {
+    val resultSet: ResultSet = session.execute(query)
+    resultSet.map { row =>
+      Entry(row.getString("word"), row.getString("description"))
+    }.toList
+  }
 
 }
 
